@@ -1,78 +1,55 @@
-# ====== 文档解析：.txt / PDF，滑动窗口切片 ======
+# ====== 文档解析：LangChain Loaders + RecursiveCharacterTextSplitter ======
+# 仅用 LangChain 做加载与分块，不做 Chain/Agent 等调度
+
+import os
+from pathlib import Path
+
+from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 CHUNK_SIZE = 500
-OVERLAP = 50
+CHUNK_OVERLAP = 50
 
 
-def read_txt(path: str, encoding: str = "utf-8") -> str:
-    """读 .txt 文件，返回全文。编码错误或空文件会抛明确异常。"""
-    try:
-        with open(path, "r", encoding=encoding) as f:
-            text = f.read().strip()
-    except UnicodeDecodeError as e:
-        raise ValueError(f"文件编码异常，请用 UTF-8 保存: {path}") from e
-    except FileNotFoundError:
+def _get_loader(path: str):
+    """按扩展名返回对应 Loader 实例，不执行 load。"""
+    p = Path(path)
+    if not p.exists():
         raise FileNotFoundError(f"文件不存在: {path}")
-    if not text:
-        raise ValueError(f"文件为空: {path}")
-    return text
-
-
-def read_pdf(path: str) -> str:
-    """用 pdfplumber 提取 PDF 全文，空页或异常时抛明确错误。"""
-    try:
-        import pdfplumber
-    except ImportError:
-        raise ImportError("请安装 pdfplumber: pip install pdfplumber") from None
-    try:
-        with pdfplumber.open(path) as pdf:
-            parts = []
-            for page in pdf.pages:
-                t = page.extract_text()
-                if t:
-                    parts.append(t)
-            text = "\n\n".join(parts).strip()
-    except FileNotFoundError:
-        raise FileNotFoundError(f"文件不存在: {path}")
-    except Exception as e:
-        raise ValueError(f"PDF 解析失败: {path}") from e
-    if not text:
-        raise ValueError(f"PDF 无有效文本: {path}")
-    return text
-
-
-def parse_document(path: str) -> str:
-    """按扩展名选 .txt 或 PDF 解析，返回全文。"""
-    p = path.lower()
-    if p.endswith(".txt"):
-        return read_txt(path)
-    if p.endswith(".pdf"):
-        return read_pdf(path)
+    suffix = p.suffix.lower()
+    if suffix == ".txt":
+        return TextLoader(path, encoding="utf-8")
+    if suffix == ".pdf":
+        return PyMuPDFLoader(path)
     raise ValueError(f"不支持的文件类型，仅支持 .txt / .pdf: {path}")
 
 
-def chunk_text(
-    text: str,
-    chunk_size: int = CHUNK_SIZE,
-    overlap: int = OVERLAP,
-) -> list[str]:
-    """按固定字数切块，块与块之间保留重叠区，避免句子在边界被截断。"""
-    if overlap >= chunk_size:
-        overlap = chunk_size - 1
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + chunk_size
-        chunks.append(text[start:end])
-        start = end - overlap
-    return chunks
+def _get_splitter(chunk_size: int = CHUNK_SIZE, chunk_overlap: int = CHUNK_OVERLAP) -> RecursiveCharacterTextSplitter:
+    """滑动窗口式分块，保证语义完整、避免手写正则。"""
+    return RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        length_function=len,
+        separators=["\n\n", "\n", "。", "！", "？", "；", " ", ""],
+    )
+
+
+def load_documents(path: str):
+    """用 LangChain Loader 加载文档，返回 Document 列表（含 metadata，如 page）。"""
+    loader = _get_loader(path)
+    docs = loader.load()
+    if not docs:
+        raise ValueError(f"文档无有效内容: {path}")
+    return docs
 
 
 def parse_document_to_chunks(
     path: str,
     chunk_size: int = CHUNK_SIZE,
-    overlap: int = OVERLAP,
+    chunk_overlap: int = CHUNK_OVERLAP,
 ) -> list[str]:
-    """解析文档（.txt / .pdf）并做滑动窗口切片，返回块列表。"""
-    text = parse_document(path)
-    return chunk_text(text, chunk_size=chunk_size, overlap=overlap)
+    """解析 .txt / .pdf 并用 RecursiveCharacterTextSplitter 分块，返回文本块列表。"""
+    docs = load_documents(path)
+    splitter = _get_splitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    split = splitter.split_documents(docs)
+    return [d.page_content for d in split if d.page_content.strip()]

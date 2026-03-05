@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 
 from . import database
 from . import wrapper
-from .rag_pipeline import run_rag
+from .rag_pipeline import run_rag, TOP_K
 from .schemas import ChatRequest, ChatResponse, TestEmbedRequest
 from .vector_store import ChromaVectorStore
 
@@ -32,7 +32,7 @@ def health():
 
 @app.post("/api/v1/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
-    """接收用户问题与可选图片，走 RAG 流水线（历史 + 检索 + Prompt + VLM），返回回答与检索片段。"""
+    """核心对话接口。支持 query、image_base64、system_prompt、top_k 等，由调用方动态控制 RAG 行为。"""
     session_id = req.session_id or "default"
     try:
         answer, retrieved_context = await run_rag(
@@ -43,6 +43,8 @@ async def chat(req: ChatRequest):
             embed_fn=wrapper.embed,
             generate_fn=wrapper.generate,
             get_history_fn=database.get_recent_messages,
+            system_prompt=req.system_prompt,
+            top_k=req.top_k if req.top_k is not None else TOP_K,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

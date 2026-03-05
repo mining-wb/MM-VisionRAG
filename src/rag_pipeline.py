@@ -8,7 +8,10 @@ from typing import Callable, Awaitable
 HISTORY_LIMIT = 6
 TOP_K = 5
 
-PROMPT_TEMPLATE = """你是一个依据参考文档回答问题的助手。请严格基于以下「参考文档」内容作答，不要编造文档中不存在的信息。
+# 底层不硬编码业务人设，默认仅做防幻觉约束；业务方通过 system_prompt 注入
+DEFAULT_SYSTEM = "你是一个依据参考文档回答问题的助手。请严格基于以下「参考文档」内容作答，不要编造文档中不存在的信息。"
+
+PROMPT_TEMPLATE = """{system_block}
 
 【参考文档】
 {context}
@@ -56,15 +59,19 @@ async def run_rag(
     get_history_fn: Callable[[str, int], list[dict]],
     top_k: int = TOP_K,
     history_limit: int = HISTORY_LIMIT,
+    system_prompt: str | None = None,
 ) -> tuple[str, list[str]]:
     """
-    执行 RAG：从 SQLite 取历史 → 向量检索 → 拼 Prompt → 调 VLM，返回 (回答, 检索片段列表)。
+    执行 RAG：取历史 → 检索 → 动态拼 Prompt（含 system_prompt）→ 调 VLM。
+    不硬编码业务人设，system_prompt 由 API 调用方传入。
     """
     history = get_history_fn(session_id, limit=history_limit)
     retrieved = await vector_store.query(question, top_k=top_k, embed_fn=embed_fn)
     context = "\n\n".join(retrieved) if retrieved else "（无相关参考文档）"
     history_text = _build_history_text(history)
+    system_block = (system_prompt or DEFAULT_SYSTEM).strip()
     prompt = PROMPT_TEMPLATE.format(
+        system_block=system_block,
         context=context,
         history=history_text,
         question=question,

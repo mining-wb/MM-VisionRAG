@@ -8,11 +8,13 @@ from pydantic import BaseModel, Field
 # ====== 请求体 ======
 
 class ChatRequest(BaseModel):
-    """聊天接口入参：用户问题、可选图片、可选文档 ID、会话 ID。"""
-    question: str = Field(..., description="用户问题文本，必填")
-    image_url: Optional[str] = Field(None, description="可选，图片 URL 或 base64，多模态用")
-    doc_id: Optional[str] = Field(None, description="可选，关联的文档 ID，后续 RAG 用")
-    session_id: Optional[str] = Field("default", description="会话 ID，多轮对话用，缺省为 default")
+    """聊天接口入参。业务层通过 system_prompt、top_k 等动态控制 RAG 引擎行为，不硬编码人设。"""
+    question: str = Field(..., description="用户问题（query），必填")
+    image_url: Optional[str] = Field(None, description="可选，图片 URL 或 base64（image_base64），多模态用")
+    doc_id: Optional[str] = Field(None, description="可选，关联的文档 ID，按文档筛选检索")
+    session_id: Optional[str] = Field("default", description="会话 ID，多轮对话用")
+    system_prompt: Optional[str] = Field(None, description="可选，系统提示词，由业务方注入人设/场景，不写死在底层")
+    top_k: Optional[int] = Field(None, ge=1, le=20, description="可选，检索返回条数，控制 RAG 召回数量")
 
 
 class TestEmbedRequest(BaseModel):

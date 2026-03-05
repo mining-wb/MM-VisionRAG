@@ -8,10 +8,11 @@ from pydantic import BaseModel, Field
 # ====== 请求体 ======
 
 class ChatRequest(BaseModel):
-    """聊天接口入参：用户问题、可选图片、可选文档 ID。"""
+    """聊天接口入参：用户问题、可选图片、可选文档 ID、会话 ID。"""
     question: str = Field(..., description="用户问题文本，必填")
     image_url: Optional[str] = Field(None, description="可选，图片 URL 或 base64，多模态用")
     doc_id: Optional[str] = Field(None, description="可选，关联的文档 ID，后续 RAG 用")
+    session_id: Optional[str] = Field("default", description="会话 ID，多轮对话用，缺省为 default")
 
 
 class TestEmbedRequest(BaseModel):

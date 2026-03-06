@@ -1,8 +1,10 @@
 # ====== 文档解析：LangChain Loaders + RecursiveCharacterTextSplitter ======
 # 仅用 LangChain 做加载与分块，不做 Chain/Agent 等调度
 
-import os
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -52,4 +54,6 @@ def parse_document_to_chunks(
     docs = load_documents(path)
     splitter = _get_splitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     split = splitter.split_documents(docs)
-    return [d.page_content for d in split if d.page_content.strip()]
+    out = [d.page_content for d in split if d.page_content.strip()]
+    logger.info("解析文档 %s -> %d 块", path, len(out))
+    return out

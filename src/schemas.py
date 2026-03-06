@@ -24,6 +24,12 @@ class TestEmbedRequest(BaseModel):
 
 # ====== 响应体 ======
 
+class UploadDocumentResponse(BaseModel):
+    """文档上传并向量化后的响应。"""
+    status: str = Field("ok", description="状态")
+    doc_id: str = Field(..., description="文档 ID，检索时可按 source 筛选")
+    chunk_count: int = Field(..., description="写入向量库的块数")
+
 class ChatResponse(BaseModel):
     """聊天接口出参：状态、大模型回答、检索到的文档片段。"""
     status: str = Field("ok", description="状态")

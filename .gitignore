@@ -6,6 +6,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# ====== 数据与上传 ======
+data/uploads/
+
 # ====== 测试与日志 ======
 .pytest_cache/
 .coverage

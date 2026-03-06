@@ -2,14 +2,30 @@ import streamlit as st
 import requests
 
 # ====== 界面布局层 ======
-# 侧边栏：标题、简介、两个上传组件，目前只展示不处理
 st.sidebar.title("MM-VisionRAG")
 st.sidebar.caption("多模态检索增强，看图+文档问答。")
 st.sidebar.divider()
 st.sidebar.subheader("上传参考文档")
-st.sidebar.file_uploader("PDF / TXT", type=["pdf", "txt"], key="upload_doc", label_visibility="collapsed")
+upload_doc = st.sidebar.file_uploader("PDF / TXT", type=["pdf", "txt"], key="upload_doc", label_visibility="collapsed")
 st.sidebar.subheader("上传图片")
 st.sidebar.file_uploader("图片", type=["png", "jpg", "jpeg"], key="upload_img", label_visibility="collapsed")
+
+# 文档上传后发到后端做解析与向量化，同一文件只传一次
+if upload_doc is not None:
+    last = st.session_state.get("last_uploaded_name")
+    if last != upload_doc.name:
+        try:
+            r = requests.post(
+                "http://127.0.0.1:8000/api/v1/upload",
+                files={"file": (upload_doc.name, upload_doc.getvalue(), upload_doc.type or "application/octet-stream")},
+                timeout=30,
+            )
+            r.raise_for_status()
+            data = r.json()
+            st.session_state["last_uploaded_name"] = upload_doc.name
+            st.sidebar.success(f"已入库：{data.get('chunk_count', 0)} 块")
+        except Exception as e:
+            st.sidebar.error(f"上传失败：{e}")
 
 # ====== 状态管理层 ======
 # 用 session_state 存对话，否则每次交互重跑脚本，之前的聊天就没了

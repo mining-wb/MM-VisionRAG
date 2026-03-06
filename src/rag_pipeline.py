@@ -2,7 +2,10 @@
 # 不用 LangChain Chain，由 FastAPI 与自研逻辑掌控
 
 import asyncio
+import logging
 from typing import Callable, Awaitable
+
+logger = logging.getLogger(__name__)
 
 # 默认最近 3 轮（6 条消息）拼进 Prompt
 HISTORY_LIMIT = 6
@@ -33,6 +36,7 @@ async def _retry(coro_factory: Callable[[], Awaitable], max_retries: int = 2, ba
             return await coro_factory()
         except Exception as e:
             last = e
+            logger.warning("RAG 调用重试: %s", e)
             if _ < max_retries:
                 await asyncio.sleep(base_delay)
     raise last

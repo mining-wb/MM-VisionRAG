@@ -44,12 +44,12 @@ if prompt := st.chat_input("输入问题，回车发送"):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # POST 到本地 FastAPI，拿回复
+    # POST 到本地 FastAPI，拿回复（大模型生成较慢，超时设长一点）
     try:
         r = requests.post(
             "http://127.0.0.1:8000/api/v1/chat",
             json={"question": prompt},
-            timeout=10,
+            timeout=180,
         )
         r.raise_for_status()
         data = r.json()
